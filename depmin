@@ -1,0 +1,123 @@
+#!/usr/bin/env python
+
+import subprocess
+import sys
+import os
+import getopt
+import string
+
+def main(argv):
+	depfile_set = False
+	deps_set = False
+	try:
+		opts, args = getopt.getopt(argv, "hf:d:", ["help", "file=", "deps="])
+	except getopt.GetoptError:
+		usage()
+		sys.exit(2)
+	for opt, arg in opts:
+		if opt in ("-h", "--help"):
+			usage()
+			sys.exit(0)
+		elif opt in ("-f", "--file"):
+			depfile = arg
+			depfile_set = True
+		elif opt in ("-d", "--deps"):
+			deps_arg = arg
+			deps_set = True
+	if (depfile_set is True) and (deps_set is True):
+		usage()
+		sys.exit('ERROR: You can only specify either a .dep file with the -f switch or dependencies using the -d switch.')
+	elif depfile_set is True:
+		deps_in = deps_from_file(depfile)
+	elif deps_set is True:
+		deps_in = deps_from_arg(deps_arg)
+	else:
+		usage()
+		sys.exit('ERROR: You need to specify dependencies one way or another.')
+	print depmin(deps_in)
+
+def usage():
+	print 'USAGE:', os.path.basename(sys.argv[0]), '[OPTIONS]'
+	print
+	print 'OPTIONS:'
+	print '    -f, --file       specify a .dep file'
+	print '    -d, --deps       provide the dependencies in the command line. Dependencies must be in quotes.'
+	print '    -h, --help       show this help message'
+	print '  You have to use either the -f or the -d switch.'
+	print
+	print 'EXAMPLES:'
+	print '    depmin -f wesnoth-1.8.5-i486-1gv.dep'
+	print '    depmin -d "libX11,libXau,libXdmcp,libXext,libXrandr,libXrender,libxcb,sdl,svgalib,zlib"'
+
+def strip_deps(deps):
+	deps_out = []
+	for i in deps:
+		if i is not '':
+			if '|' in i:
+				# if there are alternative dependencies, only keep
+				# the 2nd one. It usually is the main one
+				# ex.: openssl-solibs|openssl, or cxxlibs|gcc-g++
+				# Ugly hack, but oh, well...
+				deps_out.append(i.partition('|')[2])
+			else:
+				deps_out.append(i)
+	return deps_out
+
+def deps_from_file(path):
+	if not path.endswith('.dep'):
+		sys.exit(path+' is not a dep file.')
+	deps = []
+	f = open(path)
+	contents = f.readlines()
+	f.close()
+	for line in contents:
+		depline = line.replace('\n', ' ').lstrip(' ').rstrip(' ').replace(' ', ',').split(',')
+		for i in depline:
+			deps.append(i)
+	deps = strip_deps(deps)
+	return deps
+
+def deps_from_arg(arg):
+	deps = []
+	depline = arg.replace('\n', ' ').lstrip(' ').rstrip(' ').replace(' ', ',').split(',')
+	for i in depline:
+		deps.append(i)
+	deps = strip_deps(deps)
+	return deps
+	
+
+def pkgdeps(pkgname):
+	cmd = ['/usr/sbin/slapt-get', '--show', pkgname]
+	process = subprocess.Popen(cmd, env={'LANG': 'C'}, stdout=subprocess.PIPE)
+	output = process.communicate()[0]
+	deps = []
+	for line in output.split('\n'):
+		if line.startswith('Package Required'):
+			deps = line.rpartition('Package Required:')[2].lstrip(' ').rstrip(' ').replace(' ', ',').split(',')
+			deps = strip_deps(deps)
+	return deps
+
+def depmin(deps):
+	deps_in = strip_deps(deps)
+	pkgs_list = []
+	deps_list = []
+	for pkg in deps_in:
+		deps = pkgdeps(pkg)
+		pkgs_list.append(pkg)
+		deps_list.append(deps)
+	length = len(pkgs_list)
+	deps_out = []
+	for i in pkgs_list:
+		match = False
+		for j in range(0, length):
+			if i in deps_list[j]:
+				match = True
+		if match is False:
+			deps_out.append(i)
+	out = ""
+	for i in sorted(deps_out):
+		out = out+i+','
+	return out.rstrip(',')
+
+if __name__ == "__main__":
+	main(sys.argv[1:])
