@@ -33,15 +33,16 @@ def main(argv):
 		deps_in = deps_from_arg(deps_arg)
 	else:
 		usage()
-		sys.exit('ERROR: You need to specify dependencies one way or another.')
+		sys.exit(2)
 	print depmin(deps_in)
 
 def usage():
 	print 'USAGE:', os.path.basename(sys.argv[0]), '[OPTIONS]'
+	print 'Minimize dependencies from a .dep files, or directly from the command line.'
 	print
 	print 'OPTIONS:'
 	print '    -f, --file       specify a .dep file'
-	print '    -d, --deps       provide the dependencies in the command line. Dependencies must be in quotes.'
+	print '    -d, --deps       provide the dependencies in the command line. Dependencies must be wrapped in quotes.'
 	print '    -h, --help       show this help message'
 	print '  You have to use either the -f or the -d switch.'
 	print
