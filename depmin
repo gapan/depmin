@@ -78,10 +78,7 @@ def strip_deps(deps):
 						else:
 							thedep = 'gcc-g++'
 					elif 'glibc' in multideps:
-						if runtime_set:
-							thedep = 'glibc-solibs'
-						else:
-							thedep = 'glibc'
+						thedep = 'glibc'
 					elif 'seamonkey' in multideps:
 						if runtime_set:
 							thedep = 'seamonkey-solibs'
