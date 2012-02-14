@@ -6,11 +6,14 @@ import os
 import getopt
 import string
 
+runtime_set = False
+
 def main(argv):
 	depfile_set = False
 	deps_set = False
+	global runtime_set
 	try:
-		opts, args = getopt.getopt(argv, "hf:d:", ["help", "file=", "deps="])
+		opts, args = getopt.getopt(argv, "hrf:d:", ["help", "runtime", "file=", "deps="])
 	except getopt.GetoptError:
 		usage()
 		sys.exit(2)
@@ -18,6 +21,8 @@ def main(argv):
 		if opt in ("-h", "--help"):
 			usage()
 			sys.exit(0)
+		elif opt in ("-r", "--runtime"):
+			runtime_set = True
 		elif opt in ("-f", "--file"):
 			depfile = arg
 			depfile_set = True
@@ -43,6 +48,7 @@ def usage():
 	print 'OPTIONS:'
 	print '    -f, --file       specify a .dep file'
 	print '    -d, --deps       provide the dependencies in the command line. Dependencies must be wrapped in quotes.'
+	print '    -r, --runtime    prefer runtime dependencies to build dependencies'
 	print '    -h, --help       show this help message'
 	print '  You have to use either the -f or the -d switch.'
 	print
@@ -51,15 +57,39 @@ def usage():
 	print '    depmin -d "libX11,libXau,libXdmcp,libXext,libXrandr,libXrender,libxcb,sdl,svgalib,zlib"'
 
 def strip_deps(deps):
+	global runtime_set
 	deps_out = []
 	for i in deps:
-		if i is not '':
+		if i != '':
 			if '|' in i:
-				# if there are alternative dependencies, only keep
-				# the 2nd one. It usually is the main one
-				# ex.: openssl-solibs|openssl, or cxxlibs|gcc-g++
-				# Ugly hack, but oh, well...
-				deps_out.append(i.partition('|')[2])
+				i = i.lstrip(' ').rstrip(' ')
+				if i != '|':
+					multideps = list(i.partition('|'))
+					for n in xrange(len(multideps)):
+						multideps[n] = multideps[n].lstrip(' ').rstrip(' ')
+					if 'openssl' in multideps:
+						if runtime_set:
+							thedep = 'openssl-solibs'
+						else:
+							thedep = 'openssl'
+					elif 'gcc-g++' in multideps:
+						if runtime_set:
+							thedep = 'cxxlibs'
+						else:
+							thedep = 'gcc-g++'
+					elif 'glibc' in multideps:
+						if runtime_set:
+							thedep = 'glibc-solibs'
+						else:
+							thedep = 'glibc'
+					elif 'seamonkey' in multideps:
+						if runtime_set:
+							thedep = 'seamonkey-solibs'
+						else:
+							thedep = 'seamonkey'
+					else:
+						thedep = i.partition('|')[1]
+					deps_out.append(thedep)
 			else:
 				deps_out.append(i)
 	return deps_out
@@ -72,7 +102,7 @@ def deps_from_file(path):
 	contents = f.readlines()
 	f.close()
 	for line in contents:
-		depline = line.replace('\n', ' ').lstrip(' ').rstrip(' ').replace(' ', ',').split(',')
+		depline = line.replace('\n', ' ').lstrip(' ').rstrip(' ').split(',')
 		for i in depline:
 			deps.append(i)
 	deps = strip_deps(deps)
@@ -80,7 +110,7 @@ def deps_from_file(path):
 
 def deps_from_arg(arg):
 	deps = []
-	depline = arg.replace('\n', ' ').lstrip(' ').rstrip(' ').replace(' ', ',').split(',')
+	depline = arg.replace('\n', ' ').lstrip(' ').rstrip(' ').split(',')
 	for i in depline:
 		deps.append(i)
 	deps = strip_deps(deps)
