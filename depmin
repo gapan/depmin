@@ -88,7 +88,7 @@ def strip_deps(deps):
 						else:
 							thedep = 'seamonkey'
 					else:
-						thedep = i.partition('|')[1]
+						thedep = i.partition('|')[0]
 					deps_out.append(thedep)
 			else:
 				deps_out.append(i)
